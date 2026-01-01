@@ -1,58 +1,78 @@
-import { Injectable } from '@nestjs/common';
-import { UserMapper } from '../mappers/user.mapper';
-import { PartialUpdateUserDto } from '../dtos/partial-update-user.dto';
-import { UpdateUserDTO } from '../dtos/update-user.dto';
-import { CreateUserDTO } from '../dtos/create-user.dto';
-import { User } from '../entities/user.entity';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
+import { User } from '../models/user.model';
+import { PartialUpdateUserDto } from '../dtos/partial-update-user.dto';
+
+
+import { UpdateUserDTO } from '../dtos/update-user.dto';
+import { UserEntity } from 'src/products/entities/user.entity';
+import { CreateUserDTO } from '../dtos/create-user.dto';
 
 @Injectable()
 export class UsersService {
 
-  private users: User[] = [];
-  private currentId = 1;
+  constructor(
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
+  ) {}
 
-  findAll() {
-    return this.users.map(u => UserMapper.toResponse(u));
+  async findAll() {
+    const entities = await this.userRepository.find();
+    return entities.map(User.fromEntity).map(user => user.toResponseDto());
   }
 
-  findOne(id: number) {
-    const user = this.users.find(u => u.id === id);
-    if (!user) return { error: 'User not found' };
-    return UserMapper.toResponse(user);
+  async findOne(id: number) {
+    const entity = await this.userRepository.findOne({ where: { id } });
+    if (!entity) {
+     
+      throw new NotFoundException(`Usuario no encontrado con ID: ${id}`);
+    }
+    return User.fromEntity(entity).toResponseDto();
   }
 
-  create(dto: CreateUserDTO) {
-    const entity = UserMapper.toEntity(this.currentId++, dto);
-    this.users.push(entity);
-    return UserMapper.toResponse(entity);
+  async create(dto: CreateUserDTO) {
+    
+    const exists = await this.userRepository.findOne({ where: { email: dto.email } });
+    
+    if (exists) {
+ 
+      throw new ConflictException(`El email ya está registrado: ${dto.email}`);
+    }
+
+    const user = User.fromDto(dto);
+    const saved = await this.userRepository.save(user.toEntity());
+    return User.fromEntity(saved).toResponseDto();
   }
 
-  update(id: number, dto: UpdateUserDTO) {
-    const user = this.users.find(u => u.id === id);
-    if (!user) return { error: 'User not found' };
+  async update(id: number, dto: UpdateUserDTO) {
+    const entity = await this.userRepository.findOne({ where: { id } });
+    if (!entity) {
+      throw new NotFoundException(`Usuario no encontrado con ID: ${id}`);
+    }
 
-    user.name = dto.name;
-    user.email = dto.email;
-
-    return UserMapper.toResponse(user);
+    const updated = User.fromEntity(entity).update(dto).toEntity();
+    const saved = await this.userRepository.save(updated);
+    return User.fromEntity(saved).toResponseDto();
   }
 
-  partialUpdate(id: number, dto: PartialUpdateUserDto) {
-    const user = this.users.find(u => u.id === id);
-    if (!user) return { error: 'User not found' };
+  async partialUpdate(id: number, dto: PartialUpdateUserDto) {
+    const entity = await this.userRepository.findOne({ where: { id } });
+    if (!entity) {
+      throw new NotFoundException(`Usuario no encontrado con ID: ${id}`);
+    }
 
-    if (dto.name !== undefined) user.name = dto.name;
-    if (dto.email !== undefined) user.email = dto.email;
-
-    return UserMapper.toResponse(user);
+    const updated = User.fromEntity(entity).partialUpdate(dto).toEntity();
+    const saved = await this.userRepository.save(updated);
+    return User.fromEntity(saved).toResponseDto();
   }
 
-  delete(id: number) {
-    const exists = this.users.some(u => u.id === id);
-    if (!exists) return { error: 'User not found' };
-
-    this.users = this.users.filter(u => u.id !== id);
-    return { message: 'Deleted successfully' };
+  async delete(id: number) {
+    const result = await this.userRepository.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Usuario no encontrado con ID: ${id}`);
+    }
+    return { message: 'Usuario eliminado correctamente' };
   }
 }

@@ -1,41 +1,40 @@
-import { Controller, Get, Param, Post, Body, Patch, Delete, Put } from '@nestjs/common';
-import { CreateProductDto } from '../dtos/create-product.dto';
-import { PartialUpdateProductDto } from '../dtos/partial-update-product.dto';
-import { UpdateProductDto } from '../dtos/update-product.dto';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Put, ParseIntPipe } from '@nestjs/common';
 import { ProductsService } from '../services/products.service';
+import { CreateProductDto } from '../dtos/create-product.dto';
+import { UpdateProductDto } from '../dtos/update-product.dto';
+import { PartialUpdateProductDto } from '../dtos/partial-update-product.dto';
 
-@Controller('api/products')
+@Controller('products')
 export class ProductsController {
+  constructor(private readonly productsService: ProductsService) {}
 
-  constructor(private readonly service: ProductsService) {}
+  @Post()
+  create(@Body() createProductDto: CreateProductDto) {
+    return this.productsService.create(createProductDto);
+  }
 
   @Get()
   findAll() {
-    return this.service.findAll();
+    return this.productsService.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(Number(id));
-  }
-
-  @Post()
-  create(@Body() dto: CreateProductDto) {
-    return this.service.create(dto);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.productsService.findOne(id);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    return this.service.update(Number(id), dto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateProductDto: UpdateProductDto) {
+    return this.productsService.update(id, updateProductDto);
   }
 
   @Patch(':id')
-  partialUpdate(@Param('id') id: string, @Body() dto: PartialUpdateProductDto) {
-    return this.service.partialUpdate(Number(id), dto);
+  partialUpdate(@Param('id', ParseIntPipe) id: number, @Body() partialUpdateProductDto: PartialUpdateProductDto) {
+    return this.productsService.partialUpdate(id, partialUpdateProductDto);
   }
 
   @Delete(':id')
-  delete(@Param('id') id: string) {
-    return this.service.delete(Number(id));
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.productsService.delete(id);
   }
 }
